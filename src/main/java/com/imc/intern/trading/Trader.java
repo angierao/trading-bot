@@ -20,8 +20,8 @@ public class Trader {
     static RemoteExchangeView exchangeView;
     static Symbol book;
     static int positionThreshold = 50;
-    static double offset;
-    static double adjustment;
+    static double offset = .05;
+    static double adjustment = 0.0;
 
     private Trader() {
 
@@ -33,8 +33,8 @@ public class Trader {
         book = symb;
         for (RetailState.Level order: restingOrders) {
             if (order.getVolume() > 0) {
-                if (side.equals(Side.BUY) && order.getPrice() > fairValue ||
-                        side.equals(Side.SELL) && order.getPrice() < fairValue) {
+                if (side.equals(Side.BUY) && order.getPrice() >= fairValue + offset + adjustment ||
+                        side.equals(Side.SELL) && order.getPrice() <= fairValue - offset + adjustment) {
 
                     Side actionSide = Side.BUY;
                     if (side.equals(Side.BUY)) {
@@ -59,8 +59,19 @@ public class Trader {
     }
 
     public static void handlePosition(PositionTracker tracker) {
-        if (Math.abs(tracker.getPosition()) > positionThreshold) {
-            //System.out.println("Adjust position");
+        int currentPosition = tracker.getPosition();
+
+        // We need to sell
+        if (currentPosition > positionThreshold) {
+            System.out.println("LOWERING ADJUSTMENT");
+            adjustment += -.05;
+        }
+        else if (currentPosition < -1*positionThreshold) {
+            System.out.println("INCREASING ADJUSTMENT");
+            adjustment += .05;
+        }
+        else {
+            adjustment = 0.0;
         }
     }
 
@@ -80,6 +91,5 @@ public class Trader {
                                 bestAskPrice - 0.1, volume, OrderType.GOOD_TIL_CANCEL, Side.SELL);
                     }
                 }*/
-
     }
 }

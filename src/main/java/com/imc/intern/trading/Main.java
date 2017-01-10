@@ -44,7 +44,6 @@ public class Main
                 Trader.handlePosition(positionTracker);
 
                 if (positionTracker.changed) {
-                    System.out.println("POSITION");
                     System.out.println(positionTracker.getPosition() + "");
                     positionTracker.changed = false;
                 }
