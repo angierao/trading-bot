@@ -25,14 +25,12 @@ public class Main
         double price = 20.0;
         int volume = 10;
         int positionThreshold = 20;
+
         client.start();
 
         PositionTracker positionTracker = new PositionTracker();
         RemoteExchangeView exchangeView = client.getExchangeView();
         exchangeView.massCancel(Symbol.of(BOOK));
-
-        //exchangeView.createOrder(Symbol.of(BOOK), 19.95, volume*100, OrderType.GOOD_TIL_CANCEL, Side.BUY);
-        //exchangeView.createOrder(Symbol.of(BOOK), 20.05, volume*100, OrderType.GOOD_TIL_CANCEL, Side.SELL);
 
         exchangeView.subscribe(Symbol.of(BOOK), new OrderBookHandler() {
             public void handleRetailState(RetailState retailState) {
@@ -42,11 +40,6 @@ public class Main
                 Trader.checkRestingOrders(Symbol.of(BOOK), exchangeView, positionTracker, Side.SELL, price, retailState.getAsks());
 
                 Trader.handlePosition(positionTracker);
-
-                if (positionTracker.changed) {
-                    System.out.println(positionTracker.getPosition() + "");
-                    positionTracker.changed = false;
-                }
             }
 
             public void handleOwnTrade(OwnTrade trade) {
@@ -54,17 +47,17 @@ public class Main
                 System.out.println(trade);
 
                 int vol = trade.getVolume();
-
                 if (trade.getSide().equals(Side.SELL)) {
                     vol *= -1;
                 }
 
                 positionTracker.changePosition(vol);
+                System.out.println(positionTracker.getPosition());
                 positionTracker.changed = true;
             }
 
             public void handleTrade(Trade trade) {
-                System.out.println("HANDLE TRADE");
+                //System.out.println("HANDLE TRADE");
                 System.out.println(trade);
             }
 

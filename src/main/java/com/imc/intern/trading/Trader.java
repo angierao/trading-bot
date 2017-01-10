@@ -24,7 +24,6 @@ public class Trader {
     static double adjustment = 0.0;
 
     private Trader() {
-
     }
 
     public static void checkRestingOrders(Symbol symb, RemoteExchangeView view, PositionTracker tracker, Side side,
@@ -32,23 +31,29 @@ public class Trader {
         exchangeView = view;
         book = symb;
         for (RetailState.Level order: restingOrders) {
+            //System.out.println("HELLO1");
             if (order.getVolume() > 0) {
+                //System.out.println("HELLO2");
+                //System.out.println(fairValue);
+                //System.out.println(offset);
+                //System.out.println(adjustment);
+                //System.out.println(fairValue - offset + adjustment);
                 if (side.equals(Side.BUY) && order.getPrice() >= fairValue + offset + adjustment ||
-                        side.equals(Side.SELL) && order.getPrice() <= fairValue - offset + adjustment) {
+                        side.equals(Side.SELL) && Math.round(order.getPrice()*100.0)/100.0 <= fairValue - offset + adjustment) {
 
+                    //System.out.println("TAKING ACTION");
                     Side actionSide = Side.BUY;
                     if (side.equals(Side.BUY)) {
                         actionSide = Side.SELL;
                     }
 
                     sendOrder(book, order.getPrice(), order.getVolume(), OrderType.GOOD_TIL_CANCEL, actionSide);
-
+                    /*
                     int positionChange = order.getVolume();
                     if (side.equals(Side.SELL)) {
                         positionChange *= -1;
                     }
-
-                    tracker.changePosition(positionChange);
+                    tracker.changePosition(positionChange);*/
                 }
             }
         }
@@ -61,6 +66,8 @@ public class Trader {
     public static void handlePosition(PositionTracker tracker) {
         int currentPosition = tracker.getPosition();
 
+        //System.out.println("POSITION");
+        System.out.println(adjustment);
         // We need to sell
         if (currentPosition > positionThreshold) {
             System.out.println("LOWERING ADJUSTMENT");
@@ -76,7 +83,7 @@ public class Trader {
     }
 
     public static void diming() {
-                        /*
+        /*
                 if (retailState.getBids().size() > 0) {
                     double bestBidPrice = retailState.getBids().get(0).getPrice();
                     if (bestBidPrice < price) {
