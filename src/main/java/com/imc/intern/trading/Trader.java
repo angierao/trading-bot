@@ -48,12 +48,6 @@ public class Trader {
                     }
 
                     sendOrder(book, order.getPrice(), order.getVolume(), OrderType.GOOD_TIL_CANCEL, actionSide);
-                    /*
-                    int positionChange = order.getVolume();
-                    if (side.equals(Side.SELL)) {
-                        positionChange *= -1;
-                    }
-                    tracker.changePosition(positionChange);*/
                 }
             }
         }
@@ -82,6 +76,19 @@ public class Trader {
         }
     }
 
+    public static void checkTacos() {
+        /*
+
+        if (highestTacoBid > (lowestBeefAsk + lowestTortAsk)) {
+            buy beef and tort
+            sell taco
+        }
+        else if if (highestTacoBid > (lowestBeefAsk + lowestTortAsk)) {
+        }
+
+
+         */
+    }
     public static void diming() {
         /*
                 if (retailState.getBids().size() > 0) {
@@ -99,4 +106,6 @@ public class Trader {
                     }
                 }*/
     }
+
+
 }
