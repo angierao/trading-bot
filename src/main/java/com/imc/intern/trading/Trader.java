@@ -17,31 +17,29 @@ import java.lang.Math;
  */
 public class Trader {
 
-    static RemoteExchangeView exchangeView;
-    static Symbol book;
-    static int positionThreshold = 50;
-    static double offset = .05;
-    static double adjustment = 0.0;
+    RemoteExchangeView exchangeView;
+    Symbol book;
+    int positionThreshold = 50;
+    double offset = .05;
+    double adjustment = 0.0;
 
-    private Trader() {
+    public Trader(RemoteExchangeView view, Symbol symbol, int threshold, double off, double adj) {
+        exchangeView = view;
+        book = symbol;
+        positionThreshold = 50;
+        offset = off;
+        adjustment = adj;
     }
 
-    public static void checkRestingOrders(Symbol symb, RemoteExchangeView view, PositionTracker tracker, Side side,
+    public void checkRestingOrders(Symbol symb, RemoteExchangeView view, PositionTracker tracker, Side side,
                                           double fairValue, List<RetailState.Level> restingOrders) {
         exchangeView = view;
         book = symb;
         for (RetailState.Level order: restingOrders) {
-            //System.out.println("HELLO1");
             if (order.getVolume() > 0) {
-                //System.out.println("HELLO2");
-                //System.out.println(fairValue);
-                //System.out.println(offset);
-                //System.out.println(adjustment);
-                //System.out.println(fairValue - offset + adjustment);
                 if (side.equals(Side.BUY) && order.getPrice() >= fairValue + offset + adjustment ||
                         side.equals(Side.SELL) && Math.round(order.getPrice()*100.0)/100.0 <= fairValue - offset + adjustment) {
 
-                    //System.out.println("TAKING ACTION");
                     Side actionSide = Side.BUY;
                     if (side.equals(Side.BUY)) {
                         actionSide = Side.SELL;
@@ -53,21 +51,21 @@ public class Trader {
         }
     }
 
-    public static void sendOrder(Symbol symbol, double price, int vol, OrderType type, Side side) {
+    public void sendOrder(Symbol symbol, double price, int vol, OrderType type, Side side) {
         exchangeView.createOrder(symbol, price, vol, type, side);
     }
 
-    public static void handlePosition(PositionTracker tracker) {
+    public void handlePosition(PositionTracker tracker) {
         int currentPosition = tracker.getPosition();
 
-        //System.out.println("POSITION");
         System.out.println(adjustment);
+
         // We need to sell
         if (currentPosition > positionThreshold) {
             System.out.println("LOWERING ADJUSTMENT");
             adjustment += -.05;
         }
-        else if (currentPosition < -1*positionThreshold) {
+        else if (currentPosition < (-1*positionThreshold)) {
             System.out.println("INCREASING ADJUSTMENT");
             adjustment += .05;
         }
@@ -76,35 +74,32 @@ public class Trader {
         }
     }
 
-    public static void checkTacos() {
+    public void checkTacos() {
         /*
-
         if (highestTacoBid > (lowestBeefAsk + lowestTortAsk)) {
             buy beef and tort
             sell taco
         }
-        else if if (highestTacoBid > (lowestBeefAsk + lowestTortAsk)) {
+        else if (lowestTacoAsk < (highestBeefBid + highestTortBid)) {
         }
-
-
          */
     }
-    public static void diming() {
-        /*
-                if (retailState.getBids().size() > 0) {
-                    double bestBidPrice = retailState.getBids().get(0).getPrice();
-                    if (bestBidPrice < price) {
-                        client.getExchangeView().createOrder(retailState.getBook(),
-                                bestBidPrice + 0.1, volume, OrderType.GOOD_TIL_CANCEL, Side.BUY);
-                    }
-                }
-                if (retailState.getAsks().size() > 0) {
-                    double bestAskPrice = retailState.getAsks().get(0).getPrice();
-                    if (bestAskPrice > price) {
-                        client.getExchangeView().createOrder(retailState.getBook(),
-                                bestAskPrice - 0.1, volume, OrderType.GOOD_TIL_CANCEL, Side.SELL);
-                    }
-                }*/
+    public void diming(Symbol symb, RemoteExchangeView view, PositionTracker tracker, Side side,
+                              double fairValue, List<RetailState.Level> restingOrders) {
+        exchangeView = view;
+
+        if (restingOrders.size() > 0) {
+            RetailState.Level order = restingOrders.get(0);
+            if (side.equals(Side.BUY) && order.getPrice() > fairValue + offset) {
+                sendOrder(book, order.getPrice() + offset, order.getVolume(), OrderType.GOOD_TIL_CANCEL, side);
+            }
+            else if (side.equals(Side.SELL) && order.getPrice() < fairValue - offset) {
+                sendOrder(book, order.getPrice() - offset, order.getVolume(), OrderType.GOOD_TIL_CANCEL, side);
+            }
+        }
+        else {
+            // figure out what to do here
+        }
     }
 
 

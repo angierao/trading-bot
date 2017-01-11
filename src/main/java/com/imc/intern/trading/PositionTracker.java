@@ -18,12 +18,13 @@ public class PositionTracker {
     //HashMap<Long, ExposureUpdate> exchange;
     //int sharesBought = 0;
     //int sharesSold = 0;
-    int myPosition;
-    boolean changed = false;
+    private int myPosition;
+    private boolean changed;
     HashMap<Long, Order> myOrders;
 
     public PositionTracker() {
         myPosition = 0;
+        changed = false;
         myOrders = new HashMap<Long, Order>();
     }
 
@@ -32,8 +33,14 @@ public class PositionTracker {
         return orderId;
     }
 
-    public int changePosition(int change) {
-        myPosition += change;
+    public int changePosition(OwnTrade trade) {
+        int vol = trade.getVolume();
+        if (trade.getSide().equals(Side.SELL)) {
+            vol *= -1;
+        }
+
+        myPosition += vol;
+        changed = true;
         return myPosition;
     }
 
