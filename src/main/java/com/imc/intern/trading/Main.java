@@ -17,9 +17,9 @@ public class Main
     private static final String USERNAME = "arao";
     private static final String PASSWORD = "string peace kids drawn";
     private static final String BOOK = "ARA1";
-    private static final String TACO = "ARA.TACO";
-    private static final String BEEF = "ARA.BEEF";
-    private static final String TORT = "ARA.TORT";
+    private static final String TACO = "TACO";
+    private static final String BEEF = "BEEF";
+    private static final String TORT = "TORT";
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
     public static void main(String[] args) throws Exception
     {
@@ -38,18 +38,12 @@ public class Main
         exchangeView.massCancel(Symbol.of(BOOK));
 
         TacoTrader tacoTrader = new TacoTrader(exchangeView);
+
+        exchangeView.subscribe(Symbol.of(TACO), tacoTrader);
+        //exchangeView.subscribe(Symbol.of(TACO), positionTracker);
+
+        /*
         exchangeView.subscribe(Symbol.of(TACO), new OrderBookHandler() {
-            public void handleRetailState(RetailState retailState) {
-                System.out.println(retailState);
-
-                tacoTrader.parseTacoRetailState(retailState);
-                tacoTrader.arbitrage();
-            }
-
-            public void handleOwnTrade(OwnTrade trade) {
-                positionTracker.changePosition(trade);
-                System.out.println(positionTracker.getPosition());
-            }
 
             public void handleTrade(Trade trade) {
                 System.out.println(trade);
@@ -67,7 +61,7 @@ public class Main
                     long orderId = exposure.getOrderId();
                 }
             }
-        });
+        });*/
 
         exchangeView.subscribe(Symbol.of(BEEF), new OrderBookHandler() {
             public void handleRetailState(RetailState retailState) {

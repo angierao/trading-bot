@@ -9,42 +9,66 @@ import com.imc.intern.exchange.client.RemoteExchangeView;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 
+import java.awt.print.Book;
 import java.util.*;
 
 /**
  * Created by imc on 10/01/2017.
  */
-public class PositionTracker {
-    //HashMap<Long, ExposureUpdate> exchange;
-    //int sharesBought = 0;
-    //int sharesSold = 0;
+// ONLY THINGS THAT HAVE ALREADY HAPPENED!!!!!
+public class PositionTracker implements OrderBookHandler {
+    private final Symbol TACO = Symbol.of("TACO");
+    private final Symbol BEEF = Symbol.of("BEEF");
+    private final Symbol TORT = Symbol.of("TORT");
+
     private int myPosition;
     private int myTacoPosition;
     private int myBeefPosition;
     private int myTortPosition;
     private boolean changed;
-    HashMap<Long, Order> myOrders;
+    //HashMap<Long, Order> myOrders;
+    //private TreeMap<Long, Order> myBids;
+    //private TreeMap<Long, Order> myAsks;
 
     public PositionTracker() {
-        myPosition = 0;
+        myTacoPosition = 0;
+        myBeefPosition = 0;
+        myTortPosition = 0;
         changed = false;
-        myOrders = new HashMap<Long, Order>();
+        //myBids = new TreeMap<Long, Order>();
+        //myAsks = new TreeMap<Long, Order>();
     }
 
-    public long addOrder(Long orderId, Order order) {
-        myOrders.put(orderId, order);
+    @Override
+    public void handleOwnTrade(OwnTrade trade) {
+        changePosition(trade);
+    }
+
+    public long addBid(Long orderId, Order order) {
+        //myBids.put(orderId, order);
         return orderId;
     }
 
-    public int changePosition(OwnTrade trade) {
+
+    public void changePosition(OwnTrade trade) {
         int vol = trade.getVolume();
+
         if (trade.getSide().equals(Side.SELL)) {
             vol *= -1;
         }
 
-        myPosition += vol;
+        Symbol book = trade.getBook();
+        if (book.equals(TACO)) {
+            myTacoPosition += vol;
+        }
+        else if (book.equals(BEEF)) {
+            myBeefPosition += vol;
+        }
+        else {
+            myTortPosition += vol;
+        }
+
         changed = true;
-        return myPosition;
     }
 
     public int getPosition() {
@@ -54,4 +78,8 @@ public class PositionTracker {
     public int getTacoPosition() {
         return myTacoPosition;
     }
+
+    public int getBeefPosition() { return myBeefPosition; }
+
+    public int getTortPosition() { return myTortPosition; }
 }
