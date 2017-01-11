@@ -9,7 +9,7 @@ import com.imc.intern.exchange.client.RemoteExchangeView;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 
-import java.lang.Math;
+import java.lang.Math; // msanders: let's try to get rid of these types of unused imports
 import java.util.*;
 
 public class Main
@@ -32,6 +32,7 @@ public class Main
         RemoteExchangeView exchangeView = client.getExchangeView();
         exchangeView.massCancel(Symbol.of(BOOK));
 
+        // msanders: the new OrderBookHandler() code should probably be moved to a separate class :)
         exchangeView.subscribe(Symbol.of(BOOK), new OrderBookHandler() {
             public void handleRetailState(RetailState retailState) {
                 System.out.println(retailState);
@@ -66,6 +67,8 @@ public class Main
                 System.out.println(error);
             }
 
+            // msanders: I noticed you added a logger above -- let's switch stuff over to actually use the logger
+            //           instead of println statements
             @Override
             public void handleExposures(ExposureUpdate exposures) {
                 System.out.println(exposures);

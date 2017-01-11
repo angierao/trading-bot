@@ -20,7 +20,7 @@ public class ExchangeTracker {
 
     public ExchangeTracker() {
         exchange = new HashMap<Long, Order>();
-    }
+    } // intellij is suggesting you can' use the diamond operator here: http://www.javaworld.com/article/2074080/core-java/jdk-7--the-diamond-operator.html
 
     public long addOrder(Long orderId, Order order) {
         exchange.put(orderId, order);
