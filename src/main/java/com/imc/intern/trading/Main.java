@@ -13,7 +13,7 @@ import java.util.*;
 
 public class Main
 {
-    private static final String EXCHANGE_URL = "tcp://wintern.imc.com:61616";
+    private static final String EXCHANGE_URL = "tcp://54.227.125.23:61616";
     private static final String USERNAME = "arao";
     private static final String PASSWORD = "string peace kids drawn";
     private static final String BOOK = "ARA1";
@@ -26,10 +26,10 @@ public class Main
         ExchangeClient client = ExchangeClient.create(EXCHANGE_URL, Account.of(USERNAME), PASSWORD);
         double price = 20.0;
         int volume = 10;
-        double highestBeefBid = 0.;
-        double lowestBeefAsk = 0.;
-        double highestTortBid = 0.;
-        double lowestTortAsk = 0.;
+        double highestBeefBid = 0.0;
+        double lowestBeefAsk = 0.0;
+        double highestTortBid = 0.0;
+        double lowestTortAsk = 0.0;
 
         client.start();
 
@@ -52,7 +52,6 @@ public class Main
             }
 
             public void handleTrade(Trade trade) {
-                //System.out.println("HANDLE TRADE");
                 System.out.println(trade);
             }
 
@@ -68,7 +67,6 @@ public class Main
                     long orderId = exposure.getOrderId();
                 }
             }
-
         });
 
         exchangeView.subscribe(Symbol.of(BEEF), new OrderBookHandler() {
@@ -85,7 +83,6 @@ public class Main
             }
 
             public void handleTrade(Trade trade) {
-                //System.out.println("HANDLE TRADE");
                 System.out.println(trade);
             }
 
@@ -118,7 +115,6 @@ public class Main
             }
 
             public void handleTrade(Trade trade) {
-                //System.out.println("HANDLE TRADE");
                 System.out.println(trade);
             }
 

@@ -19,6 +19,9 @@ public class PositionTracker {
     //int sharesBought = 0;
     //int sharesSold = 0;
     private int myPosition;
+    private int myTacoPosition;
+    private int myBeefPosition;
+    private int myTortPosition;
     private boolean changed;
     HashMap<Long, Order> myOrders;
 
@@ -46,5 +49,9 @@ public class PositionTracker {
 
     public int getPosition() {
         return myPosition;
+    }
+
+    public int getTacoPosition() {
+        return myTacoPosition;
     }
 }

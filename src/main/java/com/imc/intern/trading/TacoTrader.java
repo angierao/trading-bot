@@ -2,9 +2,12 @@ package com.imc.intern.trading;
 
 import com.imc.intern.exchange.client.RemoteExchangeView;
 import com.imc.intern.exchange.datamodel.Side;
+import com.imc.intern.exchange.datamodel.api.OrderBookHandler;
 import com.imc.intern.exchange.datamodel.api.OrderType;
 import com.imc.intern.exchange.datamodel.api.RetailState;
 import com.imc.intern.exchange.datamodel.api.Symbol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.lang.Math;
@@ -12,8 +15,9 @@ import java.lang.Math;
 /**
  * Created by imc on 11/01/2017.
  */
-public class TacoTrader {
+public class TacoTrader implements OrderBookHandler {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(TacoTrader.class);
     private final Symbol TACO = Symbol.of("ARA.TACO");
 
     private RemoteExchangeView exchangeView;
@@ -28,6 +32,12 @@ public class TacoTrader {
     private int beefVol;
     private int tortVol;
 
+    private double adjustment;
+    private double offset;
+
+    private int positionThreshold;
+
+
     public TacoTrader(RemoteExchangeView view) {
         exchangeView = view;
         highestTacoBid = 0.0;
@@ -40,18 +50,50 @@ public class TacoTrader {
         tacoVol = 0;
         beefVol = 0;
         tortVol = 0;
+
+        adjustment = 0.0;
+        offset = 0.05;
+        positionThreshold = 50;
     }
 
     public void arbitrage() {
         int maxVol = Math.min(tacoVol, Math.min(beefVol, tortVol));
 
+        LOGGER.info("taco bid: {}", highestTacoBid);
+        LOGGER.info("beef ask: {}", lowestBeefAsk);
+        LOGGER.info("tort ask: {}", lowestTortAsk);
+        LOGGER.info("sell taco buy beef buy tort: ${}", highestTacoBid - lowestBeefAsk - lowestTortAsk);
+
+        LOGGER.info("");
+
+        LOGGER.info("taco ask: {}", lowestTacoAsk);
+        LOGGER.info("beef bid: {}", highestBeefBid);
+        LOGGER.info("tort bid: {}", highestTortBid);
+        LOGGER.info("buy taco sell beef sell tort: ${}", -lowestTacoAsk + highestBeefBid + highestTortBid);
+
         if (highestTacoBid > (lowestBeefAsk + lowestTortAsk)) {
             //buy beef and tort
             //sell taco
             sendOrder(TACO, highestTacoBid, maxVol, OrderType.GOOD_TIL_CANCEL, Side.SELL);
-        }
-        else if (lowestTacoAsk < (highestBeefBid + highestTortBid)) {
+        } else if (lowestTacoAsk < (highestBeefBid + highestTortBid)) {
             sendOrder(TACO, lowestTacoAsk, maxVol, OrderType.GOOD_TIL_CANCEL, Side.BUY);
+        }
+    }
+
+    public void handlePosition(PositionTracker tracker) {
+        int currentPosition = tracker.getPosition();
+
+        System.out.println(adjustment);
+
+        // We need to sell
+        if (currentPosition > positionThreshold) {
+            System.out.println("LOWERING ADJUSTMENT");
+            adjustment -= .05;
+        } else if (currentPosition < (-1 * positionThreshold)) {
+            System.out.println("INCREASING ADJUSTMENT");
+            adjustment += .05;
+        } else {
+            adjustment = 0.0;
         }
     }
 
