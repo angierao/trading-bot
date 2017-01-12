@@ -8,7 +8,11 @@ import com.imc.intern.exchange.datamodel.jms.ExposureUpdate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sun.jvm.hotspot.debugger.cdbg.Sym;
+import sun.jvm.hotspot.utilities.IntegerEnum;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.lang.Math;
 
@@ -41,9 +45,25 @@ public class TacoTrader implements OrderBookHandler {
     private double beefOffset;
     private double tortOffset;
 
+    private double tacoFairValue;
+    private double beefFairValue;
+    private double tortFairValue;
+
+    private int orderCount;
+    private int GTCCount;
+
+    private Date timeOfOrder;
+
     private int positionThreshold;
 
     private PositionTracker tracker;
+
+    private boolean getEven = false;
+
+    private int secondLimit = 30;
+    private int volumeLimit = 100;
+
+    DateFormat df;
 
     public TacoTrader(RemoteExchangeView view) {
         exchangeView = view;
@@ -66,19 +86,48 @@ public class TacoTrader implements OrderBookHandler {
         offset = 0.05;
         positionThreshold = 50;
 
+        df = new SimpleDateFormat("mm:ss");
+        timeOfOrder = new Date();
+
+        orderCount = 0;
+        GTCCount = 0;
+
         tracker = new PositionTracker();
     }
 
     @Override
     public void handleRetailState(RetailState retailState) {
-        updateStateForRetailState(retailState);
-        arbitrage();
+        System.out.println(retailState);
+        //sendOrder(BEEF, 26.0, 10, OrderType.GOOD_TIL_CANCEL, Side.SELL);
+        //sendOrder(TORT, 15.8, 10, OrderType.GOOD_TIL_CANCEL, Side.SELL);
+
+        Date updatedTime = new Date();
+        String[] currTimes = df.format(updatedTime).split(":");
+        int currMin = Integer.parseInt(currTimes[0]);
+        int currSec = Integer.parseInt(currTimes[1]);
+
+        String[] prevTimes = df.format(timeOfOrder).split(":");
+        int prevMin = Integer.parseInt(prevTimes[0]);
+        int prevSec = Integer.parseInt(prevTimes[1]);
+
+        if (prevMin*60+prevSec != currMin*60+currSec) {
+            orderCount = 0;
+        }
+
+        if (tracker.getTortPosition() == 0 && tracker.getBeefPosition() == 0 && tracker.getTortPosition() == 0) {
+
+        }
+        else {
+            updateStateForRetailState(retailState);
+            arbitrage();
+        }
     }
 
     @Override
     public void handleOwnTrade(OwnTrade trade) {
         tracker.changePosition(trade);
         handlePosition(tracker, trade);
+        System.out.println("MY TRADE");
         System.out.println(trade);
     }
 
@@ -97,10 +146,112 @@ public class TacoTrader implements OrderBookHandler {
         System.out.println(exposures);
     }
 
+    public void checkRestingOrders(RetailState retailState) {
+
+
+    }
+
+    public void getEven(PositionTracker tracker, OwnTrade trade) {
+        int tacoPosition = tracker.getTacoPosition();
+        int beefPosition = tracker.getBeefPosition();
+        int tortPosition = tracker.getTortPosition();
+
+        int tentTaco = tacoPosition;
+        int tentBeef = beefPosition;
+        int tentTort = tortPosition;
+
+        Date updatedTime = new Date();
+        String[] currTimes = df.format(updatedTime).split(":");
+        int currMin = Integer.parseInt(currTimes[0]);
+        int currSec = Integer.parseInt(currTimes[1]);
+
+        String[] prevTimes = df.format(timeOfOrder).split(":");
+        int prevMin = Integer.parseInt(prevTimes[0]);
+        int prevSec = Integer.parseInt(prevTimes[1]);
+
+        if (prevMin*60+prevSec + secondLimit < currMin*60+currSec) {
+            while (tentTort != tentBeef || tentBeef != -1*tentTaco || tentTort != -1*tentTaco) {
+                if (tentTort > -1*tentTaco) {
+                    if (tentTort >= -1*tentTaco + volumeLimit) {
+                        sendOrder(TORT, lowestTortAsk, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.SELL);
+                        tentTort -= volumeLimit;
+
+                        GTCCount += 1;
+
+                    }
+                    else {
+                        sendOrder(TORT, lowestTortAsk, Math.abs(Math.abs(tentTort) - Math.abs(tentTaco)),
+                                OrderType.GOOD_TIL_CANCEL, Side.SELL);
+                        tentTort -= Math.abs(Math.abs(tentTort) - Math.abs(tentTaco));
+
+                        GTCCount += 1;
+                    }
+
+                }
+                else {
+                    // buy tort
+                    if (tentTort + volumeLimit <= -1*tentTaco) {
+                        sendOrder(TORT, highestTortBid, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.BUY);
+                        tentTort += volumeLimit;
+
+                        GTCCount += 1;
+                    }
+                    else {
+                        sendOrder(TORT, highestTortBid, Math.abs(Math.abs(tentTort) - Math.abs(tentTaco)),
+                                OrderType.GOOD_TIL_CANCEL, Side.BUY);
+                        tentTort += Math.abs(Math.abs(tentTort) - Math.abs(tentTaco));
+
+                        GTCCount += 1;
+                    }
+                }
+
+                if (tentBeef > -1*tentTaco) {
+                    // sell beef
+                    if (tentBeef >= -1*tentTaco + volumeLimit) {
+                        sendOrder(TORT, lowestTortAsk, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.SELL);
+                        tentBeef -= volumeLimit;
+
+                        GTCCount += 1;
+                    }
+                    else {
+                        sendOrder(TORT, lowestTortAsk, Math.abs(Math.abs(tentBeef) - Math.abs(tentTaco)),
+                                OrderType.GOOD_TIL_CANCEL, Side.SELL);
+                        tentBeef -= Math.abs(Math.abs(tentBeef) - Math.abs(tentTaco));
+
+                        GTCCount += 1;
+                    }
+
+                }
+                else {
+                    // buy beef
+                    if (tentBeef + volumeLimit <= -1*tentTaco) {
+                        sendOrder(TORT, highestTortBid, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.BUY);
+                        tentBeef += volumeLimit;
+
+                        GTCCount += 1;
+                    }
+                    else {
+                        sendOrder(TORT, highestTortBid, Math.abs(Math.abs(tentBeef) - Math.abs(tentTaco)),
+                                OrderType.GOOD_TIL_CANCEL, Side.BUY);
+                        tentBeef += Math.abs(Math.abs(tentBeef) - Math.abs(tentTaco));
+
+                        GTCCount += 1;
+                    }
+                }
+            }
+
+            timeOfOrder = new Date();
+        }
+
+    }
 
     public void handlePosition(PositionTracker tracker, OwnTrade trade) {
 
         tracker.changePosition(trade);
+
+        if (getEven) {
+            getEven(tracker, trade);
+        }
 
         int ingredientPosition;
         Symbol ingredientSymbol;
@@ -125,7 +276,6 @@ public class TacoTrader implements OrderBookHandler {
                         tortAdjustment += .05;
                     }
                 }
-
             }
             else {
                 if (Math.abs(tacoPosition - absTort) > positionThreshold) {
@@ -164,22 +314,47 @@ public class TacoTrader implements OrderBookHandler {
     public void arbitrage() {
         int maxVol = Math.min(tacoVol, Math.min(beefVol, tortVol));
 
-        if (highestTacoBid != 0 && lowestBeefAsk != 0 && lowestTortAsk != 0) {
-            LOGGER.info("sell taco buy beef buy tort: ${}", highestTacoBid - lowestBeefAsk - lowestTortAsk);
-            if (highestTacoBid > (lowestBeefAsk + lowestTortAsk) && maxVol > 0) {
-                sendOrder(TACO, highestTacoBid, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
-                sendOrder(BEEF, lowestBeefAsk, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.BUY);
-                sendOrder(TORT, lowestTortAsk, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.BUY);
+        if (maxVol > volumeLimit) {
+            maxVol = volumeLimit;
+        }
+
+        Date updatedTime = new Date();
+        String[] currTimes = df.format(updatedTime).split(":");
+        int currMin = Integer.parseInt(currTimes[0]);
+        int currSec = Integer.parseInt(currTimes[1]);
+
+        String[] prevTimes = df.format(timeOfOrder).split(":");
+        int prevMin = Integer.parseInt(prevTimes[0]);
+        int prevSec = Integer.parseInt(prevTimes[1]);
+
+        if (60*currMin+currSec > 60*prevMin+prevSec + secondLimit && orderCount == 0)
+        {
+            if (highestTacoBid != 0 && lowestBeefAsk != 0 && lowestTortAsk != 0) {
+                LOGGER.info("sell taco buy beef buy tort: ${}", highestTacoBid - lowestBeefAsk - lowestTortAsk);
+                if (highestTacoBid > (lowestBeefAsk + lowestTortAsk) && maxVol > 0) {
+                    System.out.println("ARBITRAGE1");
+                    sendOrder(TACO, highestTacoBid, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
+                    sendOrder(BEEF, lowestBeefAsk, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.BUY);
+                    sendOrder(TORT, lowestTortAsk, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.BUY);
+
+                    timeOfOrder = updatedTime;
+                    orderCount += 3;
+                }
+            }
+            else if (lowestTacoAsk != 0 && highestBeefBid != 0 && highestTortBid != 0) {
+                LOGGER.info("buy taco sell beef sell tort: ${}", -lowestTacoAsk + highestBeefBid + highestTortBid);
+                if (lowestTacoAsk < (highestBeefBid + highestTortBid) && maxVol > 0) {
+                    System.out.println("ARBITRAGE2");
+                    sendOrder(TACO, lowestTacoAsk, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.BUY);
+                    sendOrder(BEEF, highestBeefBid, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
+                    sendOrder(TORT, highestTortBid, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
+
+                    timeOfOrder = updatedTime;
+                    orderCount += 3;
+                }
             }
         }
-        else if (lowestTacoAsk != 0 && highestBeefBid != 0 && highestTortBid != 0) {
-            LOGGER.info("buy taco sell beef sell tort: ${}", -lowestTacoAsk + highestBeefBid + highestTortBid);
-            if (lowestTacoAsk < (highestBeefBid + highestTortBid) && maxVol > 0) {
-                sendOrder(TACO, lowestTacoAsk, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.BUY);
-                sendOrder(BEEF, highestBeefBid, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
-                sendOrder(TORT, highestTortBid, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
-            }
-        }
+
     }
 
     public void handleTacoPosition(PositionTracker tracker) {
@@ -236,7 +411,7 @@ public class TacoTrader implements OrderBookHandler {
             if (bids.size() > 0) {
                 RetailState.Level firstBid = bids.get(0);
                 highestTacoBid = firstBid.getPrice();
-                bidVol = firstBid.getVolume();
+                bidVol = Math.min(firstBid.getVolume(), volumeLimit);
             }
             else {
                 highestTacoBid = 0.0;
@@ -246,7 +421,7 @@ public class TacoTrader implements OrderBookHandler {
             if (asks.size() > 0) {
                 RetailState.Level firstAsk = asks.get(0);
                 lowestTacoAsk = asks.get(0).getPrice();
-                askVol = firstAsk.getVolume();
+                askVol = Math.min(firstAsk.getVolume(), volumeLimit);
             }
             else {
                 lowestTacoAsk = 0.0;
@@ -262,7 +437,7 @@ public class TacoTrader implements OrderBookHandler {
             if (bids.size() > 0) {
                 RetailState.Level firstBid = bids.get(0);
                 highestBeefBid = firstBid.getPrice();
-                bidVol = firstBid.getVolume();
+                bidVol = Math.min(firstBid.getVolume(), volumeLimit);
             }
             else {
                 highestBeefBid = 0.0;
@@ -272,7 +447,7 @@ public class TacoTrader implements OrderBookHandler {
             if (asks.size() > 0) {
                 RetailState.Level firstAsk = asks.get(0);
                 lowestBeefAsk = asks.get(0).getPrice();
-                askVol = firstAsk.getVolume();
+                askVol = Math.min(firstAsk.getVolume(), volumeLimit);
             }
             else {
                 lowestBeefAsk = 0.0;
@@ -288,7 +463,7 @@ public class TacoTrader implements OrderBookHandler {
             if (bids.size() > 0) {
                 RetailState.Level firstBid = bids.get(0);
                 highestTortBid = firstBid.getPrice();
-                bidVol = firstBid.getVolume();
+                bidVol = Math.min(firstBid.getVolume(), volumeLimit);
             }
             else {
                 highestTortBid = 0.0;
@@ -298,7 +473,7 @@ public class TacoTrader implements OrderBookHandler {
             if (asks.size() > 0) {
                 RetailState.Level firstAsk = asks.get(0);
                 lowestTortAsk = asks.get(0).getPrice();
-                askVol = firstAsk.getVolume();
+                askVol = Math.min(firstAsk.getVolume(), volumeLimit);
             }
             else {
                 lowestTortAsk = 0.0;
@@ -309,52 +484,6 @@ public class TacoTrader implements OrderBookHandler {
             }
         }
 
-    }
-
-    public void parseBeefRetailState(RetailState retailState) {
-        List<RetailState.Level> bids = retailState.getBids();
-        int bidVol = 0;
-        int askVol = 0;
-
-        if (bids.size() > 0) {
-            RetailState.Level firstBid = bids.get(0);
-            highestBeefBid = firstBid.getPrice();
-            bidVol = firstBid.getVolume();
-        }
-
-        List<RetailState.Level> asks = retailState.getAsks();
-        if (asks.size() > 0) {
-            RetailState.Level firstAsk = asks.get(0);
-            lowestBeefAsk = asks.get(0).getPrice();
-            askVol = firstAsk.getVolume();
-        }
-
-        if (askVol != 0 && bidVol != 0) {
-            beefVol = Math.min(askVol, bidVol);
-        }
-    }
-
-    public void parseTortRetailState(RetailState retailState) {
-        List<RetailState.Level> bids = retailState.getBids();
-        int bidVol = 0;
-        int askVol = 0;
-
-        if (bids.size() > 0) {
-            RetailState.Level firstBid = bids.get(0);
-            highestTortBid = firstBid.getPrice();
-            bidVol = firstBid.getVolume();
-        }
-
-        List<RetailState.Level> asks = retailState.getAsks();
-        if (asks.size() > 0) {
-            RetailState.Level firstAsk = asks.get(0);
-            lowestTortAsk = asks.get(0).getPrice();
-            askVol = firstAsk.getVolume();
-        }
-
-        if (askVol != 0 && bidVol != 0) {
-            tortVol = Math.min(askVol, bidVol);
-        }
     }
 
     public void sendOrder(Symbol symbol, double price, int vol, OrderType type, Side side) {
