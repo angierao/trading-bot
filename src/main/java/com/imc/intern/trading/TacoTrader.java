@@ -109,59 +109,56 @@ public class TacoTrader implements OrderBookHandler {
         int beefPosition = tracker.getBeefPosition();
         int tortPosition = tracker.getTortPosition();
 
-        if (tacoPosition > 0) {
-            if (Math.abs(tacoPosition) > Math.min(Math.abs(beefPosition), Math.abs(tortPosition))) {
-                
-            }
+        int absBeef = Math.abs(beefPosition);
+        int absTort = Math.abs(tortPosition);
 
-            if (tracker.getBeefPosition() < tracker.getTortPosition()) {
-                ingredientPosition = tracker.getBeefPosition();
-                ingredientSymbol = BEEF;
+        if (tacoPosition > 0 && beefPosition < 0 && tortPosition < 0) {
+
+            if (Math.abs(tacoPosition - absBeef) < Math.abs(tacoPosition - absTort)) {
+
+                if (Math.abs(tacoPosition - absBeef) > positionThreshold) {
+                    // move tort toward beef
+                    if (tortPosition > beefPosition) {
+                        tortAdjustment -= .05;
+                    }
+                    else {
+                        tortAdjustment += .05;
+                    }
+                }
+
             }
             else {
-                ingredientPosition = tracker.getTortPosition();
-                ingredientSymbol = TORT;
+                if (Math.abs(tacoPosition - absTort) > positionThreshold) {
+                    // move beef toward tort
+                    if (tortPosition > beefPosition) {
+                        beefAdjustment += .05;
+                    }
+                    else {
+                        beefAdjustment -= .05;
+                    }
+                }
             }
-
-            if (ingredientPosition + tracker.getTacoPosition() > positionThreshold) {
-
-                tacoAdjustment -= .05;
-                if (ingredientSymbol.equals(BEEF)) {
-                    //sendOrder(TORT, lowestTortAsk, tracker.getTortPosition() - tracker.getBeefPosition(), OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
-                    tortAdjustment -= .05;
+        }
+        else if (tacoPosition < 0 && beefPosition > 0 && tortPosition > 0) {
+            if (Math.abs(Math.abs(tacoPosition) - beefPosition) < Math.abs(Math.abs(tacoPosition) - tortPosition)) {
+                if (Math.abs(Math.abs(tacoPosition) - beefPosition) > positionThreshold) {
+                    if (tortPosition > beefPosition) {
+                        tortAdjustment -= .05;
+                    }
+                    else {
+                        tortAdjustment += .05;
+                    }
+                }
+            }
+            else {
+                if (tortPosition > beefPosition) {
+                    beefAdjustment += .05;
                 }
                 else {
                     beefAdjustment -= .05;
                 }
             }
         }
-
-        if (Math.abs(tracker.getTacoPosition() + tracker.getBeefPosition() + tracker.getTortPosition()) > positionThreshold) {
-            if (tracker.getTacoPosition() > 0) {
-                tacoAdjustment -= .05;
-                beefAdjustment += .05;
-                tortAdjustment += .05;
-            }
-            else {
-                tacoAdjustment += .05;
-                beefAdjustment -= .05;
-                tortAdjustment -= .05;
-            }
-        }
-        /*
-        int currentPosition;
-
-
-        if (trade.getBook().equals(TACO)) {
-            //handleTacoPosition(tracker);
-
-        }
-        else if (trade.getBook().equals(BEEF)) {
-            //handleBeefPosition(tracker);
-        }
-        else {
-            //handleTortPosition(tracker);
-        }*/
     }
 
     public void arbitrage() {
