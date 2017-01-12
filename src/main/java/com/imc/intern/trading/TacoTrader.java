@@ -78,7 +78,7 @@ public class TacoTrader implements OrderBookHandler {
     @Override
     public void handleOwnTrade(OwnTrade trade) {
         tracker.changePosition(trade);
-        handlePosition(tracker, trade.getBook());
+        handlePosition(tracker, trade);
         System.out.println(trade);
     }
 
@@ -98,18 +98,70 @@ public class TacoTrader implements OrderBookHandler {
     }
 
 
-    public void handlePosition(PositionTracker tracker, Symbol book) {
+    public void handlePosition(PositionTracker tracker, OwnTrade trade) {
 
-        int currentPosition;
-        if (book.equals(TACO)) {
-            handleTacoPosition(tracker);
+        tracker.changePosition(trade);
+
+        int ingredientPosition;
+        Symbol ingredientSymbol;
+
+        int tacoPosition = tracker.getTacoPosition();
+        int beefPosition = tracker.getBeefPosition();
+        int tortPosition = tracker.getTortPosition();
+
+        if (tacoPosition > 0) {
+            if (Math.abs(tacoPosition) > Math.min(Math.abs(beefPosition), Math.abs(tortPosition))) {
+                
+            }
+
+            if (tracker.getBeefPosition() < tracker.getTortPosition()) {
+                ingredientPosition = tracker.getBeefPosition();
+                ingredientSymbol = BEEF;
+            }
+            else {
+                ingredientPosition = tracker.getTortPosition();
+                ingredientSymbol = TORT;
+            }
+
+            if (ingredientPosition + tracker.getTacoPosition() > positionThreshold) {
+
+                tacoAdjustment -= .05;
+                if (ingredientSymbol.equals(BEEF)) {
+                    //sendOrder(TORT, lowestTortAsk, tracker.getTortPosition() - tracker.getBeefPosition(), OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
+                    tortAdjustment -= .05;
+                }
+                else {
+                    beefAdjustment -= .05;
+                }
+            }
         }
-        else if (book.equals(BEEF)) {
-            handleBeefPosition(tracker);
+
+        if (Math.abs(tracker.getTacoPosition() + tracker.getBeefPosition() + tracker.getTortPosition()) > positionThreshold) {
+            if (tracker.getTacoPosition() > 0) {
+                tacoAdjustment -= .05;
+                beefAdjustment += .05;
+                tortAdjustment += .05;
+            }
+            else {
+                tacoAdjustment += .05;
+                beefAdjustment -= .05;
+                tortAdjustment -= .05;
+            }
+        }
+        /*
+        int currentPosition;
+
+
+        if (trade.getBook().equals(TACO)) {
+            //handleTacoPosition(tracker);
+
+        }
+        else if (trade.getBook().equals(BEEF)) {
+            //handleBeefPosition(tracker);
         }
         else {
-            handleTortPosition(tracker);
-        }
+            //handleTortPosition(tracker);
+        }*/
     }
 
     public void arbitrage() {
