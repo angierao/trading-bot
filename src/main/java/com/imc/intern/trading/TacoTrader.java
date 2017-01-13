@@ -15,6 +15,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.lang.Math;
+import java.util.concurrent.TimeUnit;
 
 public class TacoTrader implements OrderBookHandler {
 
@@ -23,6 +24,10 @@ public class TacoTrader implements OrderBookHandler {
     private final Symbol BEEF = Symbol.of("BEEF");
     private final Symbol TORT = Symbol.of("TORT");
 
+    /*
+    cproctor: There is a lot of duplication in this class. A better structure would be to create some sort of Book that
+    keeps track of the highest bid and ask, volume, adjustment, ..etc. It would clan up this class nicely.
+     */
     private RemoteExchangeView exchangeView;
     private double highestTacoBid;
     private double lowestTacoAsk;
@@ -101,6 +106,12 @@ public class TacoTrader implements OrderBookHandler {
         //sendOrder(BEEF, 26.0, 10, OrderType.GOOD_TIL_CANCEL, Side.SELL);
         //sendOrder(TORT, 15.8, 10, OrderType.GOOD_TIL_CANCEL, Side.SELL);
 
+
+        /*
+            cproctor: Instead of parsing the minutes and seconds, you could use the time as a long:
+            long currentTime = System.currentTimeMillis();
+            long milliTime30SecondsAgo = currentTime - TimeUnit.SECONDS.toMillis(30);
+         */
         Date updatedTime = new Date();
         String[] currTimes = df.format(updatedTime).split(":");
         int currMin = Integer.parseInt(currTimes[0]);
@@ -110,10 +121,18 @@ public class TacoTrader implements OrderBookHandler {
         int prevMin = Integer.parseInt(prevTimes[0]);
         int prevSec = Integer.parseInt(prevTimes[1]);
 
+        /*
+            cproctor: Why do you check to see if the times are equal?
+         */
         if (prevMin*60+prevSec != currMin*60+currSec) {
             orderCount = 0;
         }
 
+        /*
+            cproctor: Here, you only place an order if you're not flat. Unless you hardcode a starting position, your
+            program will always think it's flat and you'll never place an order. This might be a result of you tweaking
+            your algorithm to try and get flat, but double check that this is as intended.
+         */
         if (tracker.getTortPosition() == 0 && tracker.getBeefPosition() == 0 && tracker.getTortPosition() == 0) {
 
         }
@@ -318,6 +337,9 @@ public class TacoTrader implements OrderBookHandler {
             maxVol = volumeLimit;
         }
 
+        /*
+        cproctor: There's a lot of duplication here
+         */
         Date updatedTime = new Date();
         String[] currTimes = df.format(updatedTime).split(":");
         int currMin = Integer.parseInt(currTimes[0]);
@@ -400,6 +422,10 @@ public class TacoTrader implements OrderBookHandler {
     }
 
 
+    /*
+        cproctor: If you pull out a Book per symbol, all of this filtering and duplication goes away. At minimum, pull
+        out helper methods.
+     */
     private void updateStateForRetailState(RetailState retailState) {
 
         int bidVol = 0;
@@ -408,6 +434,12 @@ public class TacoTrader implements OrderBookHandler {
         if (retailState.getBook().equals(TACO)) {
             List<RetailState.Level> bids = retailState.getBids();
 
+            /*
+                cproctor: What is the highest level goes away? You get a retail state with volume 0, which is smaller
+                than your volume limit. You can't hit a level with volume 0, you actually want the next level, if it
+                exists. Additionally, the retail state only shows changed levels. You need to keep track of the book in
+                order to see what is available.
+             */
             if (bids.size() > 0) {
                 RetailState.Level firstBid = bids.get(0);
                 highestTacoBid = firstBid.getPrice();

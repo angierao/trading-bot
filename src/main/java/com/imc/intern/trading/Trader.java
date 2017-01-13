@@ -31,6 +31,9 @@ public class Trader {
         adjustment = adj;
     }
 
+    /*
+    Would have been nice to reuse this instead of building a new taco trader
+     */
     public void checkRestingOrders(Symbol symb, RemoteExchangeView view, PositionTracker tracker, Side side,
                                           double fairValue, List<RetailState.Level> restingOrders) {
         exchangeView = view;
