@@ -15,6 +15,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.lang.Math;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 public class TacoTrader implements OrderBookHandler {
@@ -57,7 +58,8 @@ public class TacoTrader implements OrderBookHandler {
     private int orderCount;
     private int GTCCount;
 
-    private Date timeOfOrder;
+    //private Date timeOfOrder;
+    private long lastOrderTime;
 
     private int positionThreshold;
 
@@ -65,8 +67,17 @@ public class TacoTrader implements OrderBookHandler {
 
     private boolean getEven = false;
 
+    private boolean GTCs;
+
     private int secondLimit = 30;
     private int volumeLimit = 100;
+
+    private TreeMap<Double, Order> tacoBids;
+    private TreeMap<Double, Order> tacoAsks;
+    private TreeMap<Double, Order> beefBids;
+    private TreeMap<Double, Order> beefAsks;
+    private TreeMap<Double, Order> tortBids;
+    private TreeMap<Double, Order> tortAsks;
 
     DateFormat df;
 
@@ -92,10 +103,11 @@ public class TacoTrader implements OrderBookHandler {
         positionThreshold = 50;
 
         df = new SimpleDateFormat("mm:ss");
-        timeOfOrder = new Date();
+        lastOrderTime = System.currentTimeMillis();
 
         orderCount = 0;
         GTCCount = 0;
+        GTCs = true;
 
         tracker = new PositionTracker();
     }
@@ -103,50 +115,38 @@ public class TacoTrader implements OrderBookHandler {
     @Override
     public void handleRetailState(RetailState retailState) {
         System.out.println(retailState);
-        //sendOrder(BEEF, 26.0, 10, OrderType.GOOD_TIL_CANCEL, Side.SELL);
-        //sendOrder(TORT, 15.8, 10, OrderType.GOOD_TIL_CANCEL, Side.SELL);
-
-
         /*
             cproctor: Instead of parsing the minutes and seconds, you could use the time as a long:
             long currentTime = System.currentTimeMillis();
             long milliTime30SecondsAgo = currentTime - TimeUnit.SECONDS.toMillis(30);
          */
-        Date updatedTime = new Date();
-        String[] currTimes = df.format(updatedTime).split(":");
-        int currMin = Integer.parseInt(currTimes[0]);
-        int currSec = Integer.parseInt(currTimes[1]);
 
-        String[] prevTimes = df.format(timeOfOrder).split(":");
-        int prevMin = Integer.parseInt(prevTimes[0]);
-        int prevSec = Integer.parseInt(prevTimes[1]);
+        long currentTime = System.currentTimeMillis();
+        long milliTime30SecondsAgo = currentTime - TimeUnit.SECONDS.toMillis(secondLimit);
 
         /*
             cproctor: Why do you check to see if the times are equal?
-         */
+
         if (prevMin*60+prevSec != currMin*60+currSec) {
             orderCount = 0;
-        }
+        }*/
+        
 
-        /*
-            cproctor: Here, you only place an order if you're not flat. Unless you hardcode a starting position, your
-            program will always think it's flat and you'll never place an order. This might be a result of you tweaking
-            your algorithm to try and get flat, but double check that this is as intended.
-         */
-        if (tracker.getTortPosition() == 0 && tracker.getBeefPosition() == 0 && tracker.getTortPosition() == 0) {
-
-        }
-        else {
+        if (!getEven) {
             updateStateForRetailState(retailState);
             arbitrage();
+        }
+        else {
+            getEven(tracker);
         }
     }
 
     @Override
     public void handleOwnTrade(OwnTrade trade) {
+        System.out.println("MY TRADE");
         tracker.changePosition(trade);
         handlePosition(tracker, trade);
-        System.out.println("MY TRADE");
+
         System.out.println(trade);
     }
 
@@ -167,10 +167,9 @@ public class TacoTrader implements OrderBookHandler {
 
     public void checkRestingOrders(RetailState retailState) {
 
-
     }
 
-    public void getEven(PositionTracker tracker, OwnTrade trade) {
+    public void getEven(PositionTracker tracker) {
         int tacoPosition = tracker.getTacoPosition();
         int beefPosition = tracker.getBeefPosition();
         int tortPosition = tracker.getTortPosition();
@@ -179,22 +178,17 @@ public class TacoTrader implements OrderBookHandler {
         int tentBeef = beefPosition;
         int tentTort = tortPosition;
 
-        Date updatedTime = new Date();
-        String[] currTimes = df.format(updatedTime).split(":");
-        int currMin = Integer.parseInt(currTimes[0]);
-        int currSec = Integer.parseInt(currTimes[1]);
+        long currentTime = System.currentTimeMillis();
+        long milliTime30SecondsAgo = currentTime - TimeUnit.SECONDS.toMillis(secondLimit);
 
-        String[] prevTimes = df.format(timeOfOrder).split(":");
-        int prevMin = Integer.parseInt(prevTimes[0]);
-        int prevSec = Integer.parseInt(prevTimes[1]);
-
-        if (prevMin*60+prevSec + secondLimit < currMin*60+currSec) {
+        if (lastOrderTime < milliTime30SecondsAgo) {
             while (tentTort != tentBeef || tentBeef != -1*tentTaco || tentTort != -1*tentTaco) {
                 if (tentTort > -1*tentTaco) {
                     if (tentTort >= -1*tentTaco + volumeLimit) {
                         sendOrder(TORT, lowestTortAsk, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.SELL);
                         tentTort -= volumeLimit;
 
+                        lastOrderTime = System.currentTimeMillis();
                         GTCCount += 1;
 
                     }
@@ -203,6 +197,7 @@ public class TacoTrader implements OrderBookHandler {
                                 OrderType.GOOD_TIL_CANCEL, Side.SELL);
                         tentTort -= Math.abs(Math.abs(tentTort) - Math.abs(tentTaco));
 
+                        lastOrderTime = System.currentTimeMillis();
                         GTCCount += 1;
                     }
 
@@ -213,6 +208,7 @@ public class TacoTrader implements OrderBookHandler {
                         sendOrder(TORT, highestTortBid, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.BUY);
                         tentTort += volumeLimit;
 
+                        lastOrderTime = System.currentTimeMillis();
                         GTCCount += 1;
                     }
                     else {
@@ -220,6 +216,7 @@ public class TacoTrader implements OrderBookHandler {
                                 OrderType.GOOD_TIL_CANCEL, Side.BUY);
                         tentTort += Math.abs(Math.abs(tentTort) - Math.abs(tentTaco));
 
+                        lastOrderTime = System.currentTimeMillis();
                         GTCCount += 1;
                     }
                 }
@@ -230,6 +227,7 @@ public class TacoTrader implements OrderBookHandler {
                         sendOrder(TORT, lowestTortAsk, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.SELL);
                         tentBeef -= volumeLimit;
 
+                        lastOrderTime = System.currentTimeMillis();
                         GTCCount += 1;
                     }
                     else {
@@ -237,9 +235,9 @@ public class TacoTrader implements OrderBookHandler {
                                 OrderType.GOOD_TIL_CANCEL, Side.SELL);
                         tentBeef -= Math.abs(Math.abs(tentBeef) - Math.abs(tentTaco));
 
+                        lastOrderTime = System.currentTimeMillis();
                         GTCCount += 1;
                     }
-
                 }
                 else {
                     // buy beef
@@ -247,6 +245,7 @@ public class TacoTrader implements OrderBookHandler {
                         sendOrder(TORT, highestTortBid, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.BUY);
                         tentBeef += volumeLimit;
 
+                        lastOrderTime = System.currentTimeMillis();
                         GTCCount += 1;
                     }
                     else {
@@ -254,23 +253,17 @@ public class TacoTrader implements OrderBookHandler {
                                 OrderType.GOOD_TIL_CANCEL, Side.BUY);
                         tentBeef += Math.abs(Math.abs(tentBeef) - Math.abs(tentTaco));
 
+                        lastOrderTime = System.currentTimeMillis();
                         GTCCount += 1;
                     }
                 }
             }
-
-            timeOfOrder = new Date();
         }
-
     }
 
     public void handlePosition(PositionTracker tracker, OwnTrade trade) {
 
         tracker.changePosition(trade);
-
-        if (getEven) {
-            getEven(tracker, trade);
-        }
 
         int ingredientPosition;
         Symbol ingredientSymbol;
@@ -340,17 +333,14 @@ public class TacoTrader implements OrderBookHandler {
         /*
         cproctor: There's a lot of duplication here
          */
-        Date updatedTime = new Date();
-        String[] currTimes = df.format(updatedTime).split(":");
-        int currMin = Integer.parseInt(currTimes[0]);
-        int currSec = Integer.parseInt(currTimes[1]);
 
-        String[] prevTimes = df.format(timeOfOrder).split(":");
-        int prevMin = Integer.parseInt(prevTimes[0]);
-        int prevSec = Integer.parseInt(prevTimes[1]);
+        long currentTime = System.currentTimeMillis();
+        long milliTime30SecondsAgo = currentTime - TimeUnit.SECONDS.toMillis(secondLimit);
 
-        if (60*currMin+currSec > 60*prevMin+prevSec + secondLimit && orderCount == 0)
+        //if (milliTime30SecondsAgo > lastOrderTime && orderCount == 0)
+        if (milliTime30SecondsAgo > lastOrderTime && maxVol != 0)
         {
+            LOGGER.info("FIRST LEVEL");
             if (highestTacoBid != 0 && lowestBeefAsk != 0 && lowestTortAsk != 0) {
                 LOGGER.info("sell taco buy beef buy tort: ${}", highestTacoBid - lowestBeefAsk - lowestTortAsk);
                 if (highestTacoBid > (lowestBeefAsk + lowestTortAsk) && maxVol > 0) {
@@ -359,8 +349,8 @@ public class TacoTrader implements OrderBookHandler {
                     sendOrder(BEEF, lowestBeefAsk, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.BUY);
                     sendOrder(TORT, lowestTortAsk, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.BUY);
 
-                    timeOfOrder = updatedTime;
-                    orderCount += 3;
+                    lastOrderTime = currentTime;
+                    //orderCount += 3;
                 }
             }
             else if (lowestTacoAsk != 0 && highestBeefBid != 0 && highestTortBid != 0) {
@@ -371,8 +361,8 @@ public class TacoTrader implements OrderBookHandler {
                     sendOrder(BEEF, highestBeefBid, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
                     sendOrder(TORT, highestTortBid, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
 
-                    timeOfOrder = updatedTime;
-                    orderCount += 3;
+                    lastOrderTime = currentTime;
+                    //orderCount += 3;
                 }
             }
         }
@@ -421,7 +411,6 @@ public class TacoTrader implements OrderBookHandler {
         }
     }
 
-
     /*
         cproctor: If you pull out a Book per symbol, all of this filtering and duplication goes away. At minimum, pull
         out helper methods.
@@ -459,9 +448,8 @@ public class TacoTrader implements OrderBookHandler {
                 lowestTacoAsk = 0.0;
             }
 
-            if (askVol != 0 && bidVol != 0) {
-                tacoVol = Math.min(askVol, bidVol);
-            }
+        tacoVol = Math.min(askVol, bidVol);
+
         }
         else if (retailState.getBook().equals(BEEF)) {
             List<RetailState.Level> bids = retailState.getBids();
@@ -485,9 +473,8 @@ public class TacoTrader implements OrderBookHandler {
                 lowestBeefAsk = 0.0;
             }
 
-            if (askVol != 0 && bidVol != 0) {
-                beefVol = Math.min(askVol, bidVol);
-            }
+            beefVol = Math.min(askVol, bidVol);
+
         }
         else {
             List<RetailState.Level> bids = retailState.getBids();
@@ -511,11 +498,9 @@ public class TacoTrader implements OrderBookHandler {
                 lowestTortAsk = 0.0;
             }
 
-            if (askVol != 0 && bidVol != 0) {
-                tortVol = Math.min(askVol, bidVol);
-            }
-        }
+            tortVol = Math.min(askVol, bidVol);
 
+        }
     }
 
     public void sendOrder(Symbol symbol, double price, int vol, OrderType type, Side side) {

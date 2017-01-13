@@ -30,6 +30,8 @@ public class PositionTracker implements OrderBookHandler {
     //private TreeMap<Long, Order> myBids;
     //private TreeMap<Long, Order> myAsks;
 
+
+
     public PositionTracker() {
         myTacoPosition = 0;
         myBeefPosition = 0;
@@ -37,6 +39,10 @@ public class PositionTracker implements OrderBookHandler {
         changed = false;
         //myBids = new TreeMap<Long, Order>();
         //myAsks = new TreeMap<Long, Order>();
+
+        taco = new TreeMap<>();
+        beef = new TreeMap<>();
+        tort = new TreeMap<>();
     }
 
     @Override
