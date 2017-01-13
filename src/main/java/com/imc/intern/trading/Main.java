@@ -6,6 +6,7 @@ import com.imc.intern.exchange.datamodel.api.*;
 import com.imc.intern.exchange.datamodel.api.Error;
 import com.imc.intern.exchange.datamodel.jms.ExposureUpdate;
 import com.imc.intern.exchange.client.RemoteExchangeView;
+import com.sun.tools.doclets.formats.html.SourceToHTMLConverter;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 import sun.jvm.hotspot.debugger.cdbg.Sym;
@@ -37,24 +38,11 @@ public class Main
         exchangeView.massCancel(Symbol.of(TORT));
 
         TacoTrader tacoTrader = new TacoTrader(exchangeView);
-        exchangeView.createOrder(Symbol.of(BEEF), 26.05, 100, OrderType.GOOD_TIL_CANCEL, Side.SELL);
-        exchangeView.createOrder(Symbol.of(BEEF), 25.95, 100, OrderType.GOOD_TIL_CANCEL, Side.BUY);
-        exchangeView.createOrder(Symbol.of(TORT), 15.35, 100, OrderType.GOOD_TIL_CANCEL, Side.BUY);
-        exchangeView.createOrder(Symbol.of(TORT), 15.4, 100, OrderType.GOOD_TIL_CANCEL, Side.SELL);
+        if (exchangeView.getTrades() != null) {
+            tacoTrader.setPosition(exchangeView.getTrades());
+        }
 
-        exchangeView.createOrder(Symbol.of(TACO), 40.65, 100, OrderType.GOOD_TIL_CANCEL, Side.SELL);
-        exchangeView.createOrder(Symbol.of(TACO), 40.5, 100, OrderType.GOOD_TIL_CANCEL, Side.BUY);
-
-        /*
-        exchangeView.createOrder(Symbol.of(BEEF), 26.05, 10, OrderType.GOOD_TIL_CANCEL, Side.SELL);
-        exchangeView.createOrder(Symbol.of(BEEF), 25.95, 10, OrderType.GOOD_TIL_CANCEL, Side.BUY);
-        exchangeView.createOrder(Symbol.of(TORT), 15.35, 10, OrderType.GOOD_TIL_CANCEL, Side.BUY);
-        exchangeView.createOrder(Symbol.of(TORT), 15.4, 10, OrderType.GOOD_TIL_CANCEL, Side.SELL);
-
-        exchangeView.createOrder(Symbol.of(TACO), 40.65, 10, OrderType.GOOD_TIL_CANCEL, Side.SELL);
-        exchangeView.createOrder(Symbol.of(TACO), 40.5, 10, OrderType.GOOD_TIL_CANCEL, Side.BUY);*/
-
-        //exchangeView.createOrder(Symbol.of(TORT), 15.35, 4, OrderType.GOOD_TIL_CANCEL, Side.BUY);
+        int limit = 100;
 
         exchangeView.subscribe(Symbol.of(TACO), tacoTrader);
         exchangeView.subscribe(Symbol.of(BEEF), tacoTrader);

@@ -39,10 +39,6 @@ public class PositionTracker implements OrderBookHandler {
         changed = false;
         //myBids = new TreeMap<Long, Order>();
         //myAsks = new TreeMap<Long, Order>();
-
-        taco = new TreeMap<>();
-        beef = new TreeMap<>();
-        tort = new TreeMap<>();
     }
 
     @Override
@@ -88,4 +84,28 @@ public class PositionTracker implements OrderBookHandler {
     public int getBeefPosition() { return myBeefPosition; }
 
     public int getTortPosition() { return myTortPosition; }
+
+    public void setTacoPosition(int newPosition) {
+        myTacoPosition = newPosition;
+    }
+
+    public void setBeefPosition(int newPosition) {
+        myBeefPosition = newPosition;
+    }
+
+    public void setTortPosition(int newPosition) {
+        myTortPosition = newPosition;
+    }
+
+    public void changeTacoPosition(int change) {
+        myTacoPosition += change;
+    }
+
+    public void changeBeefPosition(int change) {
+        myBeefPosition += change;
+    }
+
+    public void changeTortPosition(int change) {
+        myTortPosition += change;
+    }
 }

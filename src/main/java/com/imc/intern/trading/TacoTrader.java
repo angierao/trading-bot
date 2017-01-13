@@ -9,14 +9,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sun.jvm.hotspot.debugger.cdbg.Sym;
 import sun.jvm.hotspot.utilities.IntegerEnum;
+import sun.rmi.runtime.Log;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.lang.Math;
-import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.Iterator;
 
 public class TacoTrader implements OrderBookHandler {
 
@@ -69,15 +69,15 @@ public class TacoTrader implements OrderBookHandler {
 
     private boolean GTCs;
 
-    private int secondLimit = 30;
+    private int secondLimit = 10;
     private int volumeLimit = 100;
 
-    private TreeMap<Double, Order> tacoBids;
-    private TreeMap<Double, Order> tacoAsks;
-    private TreeMap<Double, Order> beefBids;
-    private TreeMap<Double, Order> beefAsks;
-    private TreeMap<Double, Order> tortBids;
-    private TreeMap<Double, Order> tortAsks;
+    private TreeMap<Double, RetailState.Level> tacoBids;
+    private TreeMap<Double, RetailState.Level> tacoAsks;
+    private TreeMap<Double, RetailState.Level> beefBids;
+    private TreeMap<Double, RetailState.Level> beefAsks;
+    private TreeMap<Double, RetailState.Level> tortBids;
+    private TreeMap<Double, RetailState.Level> tortAsks;
 
     DateFormat df;
 
@@ -105,6 +105,14 @@ public class TacoTrader implements OrderBookHandler {
         df = new SimpleDateFormat("mm:ss");
         lastOrderTime = System.currentTimeMillis();
 
+        tacoBids = new TreeMap<>();
+        beefBids = new TreeMap<>();
+        tortBids = new TreeMap<>();
+
+        tacoAsks = new TreeMap<>();
+        beefAsks = new TreeMap<>();
+        tortAsks = new TreeMap<>();
+
         orderCount = 0;
         GTCCount = 0;
         GTCs = true;
@@ -112,25 +120,56 @@ public class TacoTrader implements OrderBookHandler {
         tracker = new PositionTracker();
     }
 
+    public void setPosition(Map<Symbol, List<OwnTrade>> myTrades) {
+        List<OwnTrade> tacoTrades = myTrades.getOrDefault(TACO, Collections.emptyList());
+
+        for (OwnTrade trade: tacoTrades) {
+            if (trade.getSide().equals(Side.BUY)) {
+                tracker.changeTacoPosition(trade.getVolume());
+            }
+            else {
+                tracker.changeTacoPosition(-1*trade.getVolume());
+            }
+        }
+
+        List<OwnTrade> beefTrades = myTrades.getOrDefault(BEEF, Collections.emptyList());
+
+        for (OwnTrade trade: beefTrades) {
+            if (trade.getSide().equals(Side.BUY)) {
+                tracker.changeBeefPosition(trade.getVolume());
+            }
+            else {
+                tracker.changeBeefPosition(-1*trade.getVolume());
+            }
+        }
+
+        List<OwnTrade> tortTrades = myTrades.getOrDefault(TORT, Collections.emptyList());;
+
+        for (OwnTrade trade: tortTrades) {
+            if (trade.getSide().equals(Side.BUY)) {
+                tracker.changeTortPosition(trade.getVolume());
+            }
+            else {
+                tracker.changeTortPosition(-1*trade.getVolume());
+            }
+        }
+
+
+
+
+    }
     @Override
     public void handleRetailState(RetailState retailState) {
         System.out.println(retailState);
-        /*
-            cproctor: Instead of parsing the minutes and seconds, you could use the time as a long:
-            long currentTime = System.currentTimeMillis();
-            long milliTime30SecondsAgo = currentTime - TimeUnit.SECONDS.toMillis(30);
-         */
-
         long currentTime = System.currentTimeMillis();
         long milliTime30SecondsAgo = currentTime - TimeUnit.SECONDS.toMillis(secondLimit);
-
         /*
             cproctor: Why do you check to see if the times are equal?
 
         if (prevMin*60+prevSec != currMin*60+currSec) {
             orderCount = 0;
         }*/
-        
+
 
         if (!getEven) {
             updateStateForRetailState(retailState);
@@ -181,10 +220,10 @@ public class TacoTrader implements OrderBookHandler {
         long currentTime = System.currentTimeMillis();
         long milliTime30SecondsAgo = currentTime - TimeUnit.SECONDS.toMillis(secondLimit);
 
-        if (lastOrderTime < milliTime30SecondsAgo) {
+        if (lastOrderTime > milliTime30SecondsAgo) {
             while (tentTort != tentBeef || tentBeef != -1*tentTaco || tentTort != -1*tentTaco) {
                 if (tentTort > -1*tentTaco) {
-                    if (tentTort >= -1*tentTaco + volumeLimit) {
+                    if (tentTort >= -1*tentTaco + volumeLimit && lowestTortAsk != 0) {
                         sendOrder(TORT, lowestTortAsk, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.SELL);
                         tentTort -= volumeLimit;
 
@@ -192,7 +231,7 @@ public class TacoTrader implements OrderBookHandler {
                         GTCCount += 1;
 
                     }
-                    else {
+                    else if (lowestTortAsk != 0) {
                         sendOrder(TORT, lowestTortAsk, Math.abs(Math.abs(tentTort) - Math.abs(tentTaco)),
                                 OrderType.GOOD_TIL_CANCEL, Side.SELL);
                         tentTort -= Math.abs(Math.abs(tentTort) - Math.abs(tentTaco));
@@ -204,14 +243,14 @@ public class TacoTrader implements OrderBookHandler {
                 }
                 else {
                     // buy tort
-                    if (tentTort + volumeLimit <= -1*tentTaco) {
+                    if (tentTort + volumeLimit <= -1*tentTaco && highestTortBid != 0) {
                         sendOrder(TORT, highestTortBid, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.BUY);
                         tentTort += volumeLimit;
 
                         lastOrderTime = System.currentTimeMillis();
                         GTCCount += 1;
                     }
-                    else {
+                    else if (highestTortBid != 0) {
                         sendOrder(TORT, highestTortBid, Math.abs(Math.abs(tentTort) - Math.abs(tentTaco)),
                                 OrderType.GOOD_TIL_CANCEL, Side.BUY);
                         tentTort += Math.abs(Math.abs(tentTort) - Math.abs(tentTaco));
@@ -223,14 +262,14 @@ public class TacoTrader implements OrderBookHandler {
 
                 if (tentBeef > -1*tentTaco) {
                     // sell beef
-                    if (tentBeef >= -1*tentTaco + volumeLimit) {
+                    if (tentBeef >= -1*tentTaco + volumeLimit && lowestTortAsk != 0) {
                         sendOrder(TORT, lowestTortAsk, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.SELL);
                         tentBeef -= volumeLimit;
 
                         lastOrderTime = System.currentTimeMillis();
                         GTCCount += 1;
                     }
-                    else {
+                    else if (lowestTortAsk != 0) {
                         sendOrder(TORT, lowestTortAsk, Math.abs(Math.abs(tentBeef) - Math.abs(tentTaco)),
                                 OrderType.GOOD_TIL_CANCEL, Side.SELL);
                         tentBeef -= Math.abs(Math.abs(tentBeef) - Math.abs(tentTaco));
@@ -241,16 +280,16 @@ public class TacoTrader implements OrderBookHandler {
                 }
                 else {
                     // buy beef
-                    if (tentBeef + volumeLimit <= -1*tentTaco) {
-                        sendOrder(TORT, highestTortBid, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.BUY);
+                    if (tentBeef + volumeLimit <= -1*tentTaco && highestTortBid != 0) {
+                        //sendOrder(TORT, highestTortBid, volumeLimit, OrderType.GOOD_TIL_CANCEL, Side.BUY);
                         tentBeef += volumeLimit;
 
                         lastOrderTime = System.currentTimeMillis();
                         GTCCount += 1;
                     }
-                    else {
-                        sendOrder(TORT, highestTortBid, Math.abs(Math.abs(tentBeef) - Math.abs(tentTaco)),
-                                OrderType.GOOD_TIL_CANCEL, Side.BUY);
+                    else if (highestTortBid != 0) {
+                        //sendOrder(TORT, highestTortBid, Math.abs(Math.abs(tentBeef) - Math.abs(tentTaco)),
+                                //OrderType.GOOD_TIL_CANCEL, Side.BUY);
                         tentBeef += Math.abs(Math.abs(tentBeef) - Math.abs(tentTaco));
 
                         lastOrderTime = System.currentTimeMillis();
@@ -329,27 +368,29 @@ public class TacoTrader implements OrderBookHandler {
         if (maxVol > volumeLimit) {
             maxVol = volumeLimit;
         }
-
         /*
         cproctor: There's a lot of duplication here
          */
 
         long currentTime = System.currentTimeMillis();
         long milliTime30SecondsAgo = currentTime - TimeUnit.SECONDS.toMillis(secondLimit);
+        LOGGER.info("HELLO {} {} {} {}", maxVol, tacoVol, beefVol, tortVol);
+        LOGGER.info("{} {}", milliTime30SecondsAgo, lastOrderTime);
 
         //if (milliTime30SecondsAgo > lastOrderTime && orderCount == 0)
-        if (milliTime30SecondsAgo > lastOrderTime && maxVol != 0)
+        if (milliTime30SecondsAgo < lastOrderTime && maxVol != 0)
         {
             LOGGER.info("FIRST LEVEL");
             if (highestTacoBid != 0 && lowestBeefAsk != 0 && lowestTortAsk != 0) {
                 LOGGER.info("sell taco buy beef buy tort: ${}", highestTacoBid - lowestBeefAsk - lowestTortAsk);
                 if (highestTacoBid > (lowestBeefAsk + lowestTortAsk) && maxVol > 0) {
                     System.out.println("ARBITRAGE1");
+
                     sendOrder(TACO, highestTacoBid, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
                     sendOrder(BEEF, lowestBeefAsk, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.BUY);
                     sendOrder(TORT, lowestTortAsk, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.BUY);
 
-                    lastOrderTime = currentTime;
+                    lastOrderTime = System.currentTimeMillis();
                     //orderCount += 3;
                 }
             }
@@ -357,11 +398,12 @@ public class TacoTrader implements OrderBookHandler {
                 LOGGER.info("buy taco sell beef sell tort: ${}", -lowestTacoAsk + highestBeefBid + highestTortBid);
                 if (lowestTacoAsk < (highestBeefBid + highestTortBid) && maxVol > 0) {
                     System.out.println("ARBITRAGE2");
+
                     sendOrder(TACO, lowestTacoAsk, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.BUY);
                     sendOrder(BEEF, highestBeefBid, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
                     sendOrder(TORT, highestTortBid, maxVol, OrderType.IMMEDIATE_OR_CANCEL, Side.SELL);
 
-                    lastOrderTime = currentTime;
+                    lastOrderTime = System.currentTimeMillis();
                     //orderCount += 3;
                 }
             }
@@ -421,7 +463,6 @@ public class TacoTrader implements OrderBookHandler {
         int askVol = 0;
 
         if (retailState.getBook().equals(TACO)) {
-            List<RetailState.Level> bids = retailState.getBids();
 
             /*
                 cproctor: What is the highest level goes away? You get a retail state with volume 0, which is smaller
@@ -429,76 +470,207 @@ public class TacoTrader implements OrderBookHandler {
                 exists. Additionally, the retail state only shows changed levels. You need to keep track of the book in
                 order to see what is available.
              */
-            if (bids.size() > 0) {
-                RetailState.Level firstBid = bids.get(0);
-                highestTacoBid = firstBid.getPrice();
-                bidVol = Math.min(firstBid.getVolume(), volumeLimit);
+            List<RetailState.Level> bids = retailState.getBids();
+
+            for (RetailState.Level bid: bids) {
+                tacoBids.put(bid.getPrice(), bid);
+
             }
-            else {
-                highestTacoBid = 0.0;
+
+            if (tacoBids.size() > 0) {
+                /*
+                LOGGER.info("TACO BIDS");
+                System.out.println(tacoBids);
+                LOGGER.info(Double.toString(tacoBids.lastKey()));
+                LOGGER.info(Double.toString(tacoBids.firstKey()));*/
+
+                highestTacoBid = tacoBids.lastKey();
+                bidVol = tacoBids.get(highestTacoBid).getVolume();
+
             }
 
             List<RetailState.Level> asks = retailState.getAsks();
-            if (asks.size() > 0) {
-                RetailState.Level firstAsk = asks.get(0);
-                lowestTacoAsk = asks.get(0).getPrice();
-                askVol = Math.min(firstAsk.getVolume(), volumeLimit);
-            }
-            else {
-                lowestTacoAsk = 0.0;
+
+            for (RetailState.Level ask: asks) {
+                tacoAsks.put(ask.getPrice(), ask);
             }
 
-        tacoVol = Math.min(askVol, bidVol);
+            if (tacoAsks.size() > 0) {
+
+                lowestTacoAsk = tacoAsks.firstKey();
+                askVol = tacoAsks.get(lowestTacoAsk).getVolume();
+
+                //LOGGER.info(Double.toString(tacoBids.lastKey()));
+                //LOGGER.info(Double.toString(tacoBids.firstKey()));
+
+            }
+
+            tacoVol = Math.min(askVol, bidVol);
+
+            for(Map.Entry<Double, RetailState.Level> entry : tacoBids.entrySet()) {
+                RetailState.Level bid = entry.getValue();
+                if (tacoBids.get(bid.getPrice()).getVolume() == 0) {
+                    tacoBids.remove(bid.getPrice());
+                }
+            }
+
+            LOGGER.info("TACO ASKS");
+            System.out.println(tacoAsks.entrySet());
+
+            // Get a set of the entries
+            Set<Map.Entry<Double, RetailState.Level>> set = tacoAsks.entrySet();
+
+            // Get an iterator
+            Iterator<Map.Entry<Double, RetailState.Level>> it = set.iterator();
+
+            // Display elements
+            while(it.hasNext()) {
+                Map.Entry<Double, RetailState.Level> me = (Map.Entry<Double, RetailState.Level>)it.next();
+
+                RetailState.Level ask = me.getValue();
+                if (tacoAsks.get(ask.getPrice()).getVolume() == 0) {
+                    tacoAsks.remove(ask.getPrice());
+                }
+
+            }
 
         }
         else if (retailState.getBook().equals(BEEF)) {
             List<RetailState.Level> bids = retailState.getBids();
 
-            if (bids.size() > 0) {
-                RetailState.Level firstBid = bids.get(0);
-                highestBeefBid = firstBid.getPrice();
-                bidVol = Math.min(firstBid.getVolume(), volumeLimit);
+            for (RetailState.Level bid: bids) {
+                beefBids.put(bid.getPrice(), bid);
             }
-            else {
-                highestBeefBid = 0.0;
+
+
+            if (beefBids.size() > 0) {
+                /*
+                LOGGER.info("BEEF BIDS");
+                System.out.println(beefBids);
+                LOGGER.info(Double.toString(beefBids.lastKey()));
+                LOGGER.info(Double.toString(beefBids.firstKey()));*/
+
+                highestBeefBid = beefBids.lastKey();
+                bidVol = beefBids.get(highestBeefBid).getVolume();
+
             }
 
             List<RetailState.Level> asks = retailState.getAsks();
-            if (asks.size() > 0) {
-                RetailState.Level firstAsk = asks.get(0);
-                lowestBeefAsk = asks.get(0).getPrice();
-                askVol = Math.min(firstAsk.getVolume(), volumeLimit);
-            }
-            else {
-                lowestBeefAsk = 0.0;
+
+            for (RetailState.Level ask: asks) {
+                beefAsks.put(ask.getPrice(), ask);
             }
 
+            if (beefAsks.size() > 0) {
+
+                lowestBeefAsk = beefAsks.firstKey();
+                askVol = beefAsks.get(lowestBeefAsk).getVolume();
+
+            }
+            else {
+                LOGGER.info("NO TACO ASK WHAT");
+                lowestBeefAsk = 0.0;
+            }
             beefVol = Math.min(askVol, bidVol);
+
+            for(Map.Entry<Double, RetailState.Level> entry : beefBids.entrySet()) {
+                RetailState.Level bid = entry.getValue();
+                if (beefBids.get(bid.getPrice()).getVolume() == 0) {
+                    beefBids.remove(bid.getPrice());
+                }
+            }
+
+            LOGGER.info("BEEF ASKS");
+            System.out.println(beefAsks.entrySet());
+
+            // Get a set of the entries
+            Set<Map.Entry<Double, RetailState.Level>> set = beefAsks.entrySet();
+
+            // Get an iterator
+            Iterator<Map.Entry<Double, RetailState.Level>> it = set.iterator();
+
+            // Display elements
+            while(it.hasNext()) {
+                Map.Entry<Double, RetailState.Level> me = (Map.Entry<Double, RetailState.Level>)it.next();
+
+                RetailState.Level ask = me.getValue();
+                if (beefAsks.get(ask.getPrice()).getVolume() == 0) {
+                    beefAsks.remove(ask.getPrice());
+                }
+
+            }
 
         }
         else {
+
             List<RetailState.Level> bids = retailState.getBids();
 
-            if (bids.size() > 0) {
-                RetailState.Level firstBid = bids.get(0);
-                highestTortBid = firstBid.getPrice();
-                bidVol = Math.min(firstBid.getVolume(), volumeLimit);
+            for (RetailState.Level bid: bids) {
+                tortBids.put(bid.getPrice(), bid);
+            }
+
+            if (tortBids.size() > 0) {
+                //highestTortBid = tortBids.lastKey();
+
+                //LOGGER.info(Double.toString(tortBids.lastKey()));
+                //LOGGER.info(Double.toString(tortBids.firstKey()));
+
+                //bidVol = tortBids.get(highestTortBid).getVolume();
+                /*
+                LOGGER.info("TORT BIDS");
+                System.out.println(tortBids);
+                LOGGER.info(Double.toString(tortBids.lastKey()));
+                LOGGER.info(Double.toString(tortBids.firstKey()));*/
+
+                highestTortBid = tortBids.lastKey();
+                bidVol = tortBids.get(highestTortBid).getVolume();
+
             }
             else {
+                LOGGER.info("NO TACO BID WHAT");
                 highestTortBid = 0.0;
             }
 
             List<RetailState.Level> asks = retailState.getAsks();
-            if (asks.size() > 0) {
-                RetailState.Level firstAsk = asks.get(0);
-                lowestTortAsk = asks.get(0).getPrice();
-                askVol = Math.min(firstAsk.getVolume(), volumeLimit);
+
+            for (RetailState.Level ask: asks) {
+                tortAsks.put(ask.getPrice(), ask);
             }
-            else {
-                lowestTortAsk = 0.0;
+
+            if (tortAsks.size() > 0) {
+                lowestTortAsk = tortAsks.firstKey();
+                askVol = tortAsks.get(lowestTortAsk).getVolume();
+
             }
 
             tortVol = Math.min(askVol, bidVol);
+
+            for(Map.Entry<Double, RetailState.Level> entry : tortBids.entrySet()) {
+                RetailState.Level bid = entry.getValue();
+                if (tortBids.get(bid.getPrice()).getVolume() == 0) {
+                    tortBids.remove(bid.getPrice());
+                }
+            }
+
+            LOGGER.info("TORT ASKS");
+            System.out.println(tortAsks.entrySet());
+
+            // Get a set of the entries
+            Set<Map.Entry<Double, RetailState.Level>> set = tortAsks.entrySet();
+
+            // Get an iterator
+            Iterator<Map.Entry<Double, RetailState.Level>> it = set.iterator();
+
+            // Display elements
+            while(it.hasNext()) {
+                Map.Entry<Double, RetailState.Level> me = (Map.Entry<Double, RetailState.Level>) it.next();
+
+                RetailState.Level ask = me.getValue();
+                if (tortAsks.get(ask.getPrice()).getVolume() == 0) {
+                    tortAsks.remove(ask.getPrice());
+                }
+
+            }
 
         }
     }
